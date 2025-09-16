@@ -19,18 +19,18 @@
 <div class="wrap">
   <div class="card">
     <h2>Admin Panel — DB Manager</h2>
-    <p class="muted">Masukkan DB repo info + token untuk memuat & mengubah database.json (private repo).</p>
+    <p class="muted">DB repo info telah diisi otomatis sesuai data yang diberikan.</p>
 
     <div class="row">
-      <input id="owner" placeholder="DB owner (username/org)" />
-      <input id="repo" placeholder="DB repo name" />
+      <input id="owner" placeholder="DB owner (username/org)" value="Slownam" />
+      <input id="repo" placeholder="DB repo name" value="databsepanel" />
     </div>
     <div class="row" style="margin-top:8px">
-      <input id="path" placeholder="Path to database.json (eg: database.json)" />
+      <input id="path" placeholder="Path to database.json (eg: database.json)" value="database.json" />
       <input id="branch" placeholder="Branch (main)" value="main" />
     </div>
     <div style="margin-top:8px;display:flex;gap:8px">
-      <input id="token" placeholder="GitHub token (fine-grained)"/>
+      <input id="token" placeholder="GitHub token (fine-grained)" value="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" />
       <button id="saveBtn" class="btn">Save & Load DB</button>
     </div>
 
@@ -58,20 +58,13 @@
 </div>
 
 <script>
-/* Admin UI (WORKING)
- - admin inputs repo owner, repo, path, branch, token
- - Load DB (GET), show preview
- - Generate code (lf + 5 alnum) -> append to db.codes -> PUT
- - Edit DB: show textarea -> save -> PUT
-*/
-
 function b64enc(s){ return btoa(unescape(encodeURIComponent(s))); }
 function b64dec(b){ try{ return decodeURIComponent(escape(atob(b))); }catch(e){ return atob(b); } }
 const API_BASE = 'https://api.github.com/repos';
 
 let currentDB = null;
 let currentSha = null;
-let cfg = {};
+let cfg = { owner:'Slownam', repo:'databsepanel', path:'database.json', branch:'main', token:'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' };
 
 function setStatus(t){ document.getElementById('status').textContent = t; }
 
@@ -105,7 +98,7 @@ async function loadDb(){
     if(!file){
       currentDB = { codes: [], accounts: [] };
       currentSha = null;
-      setStatus('DB not found — will be created on save.');
+      setStatus('DB tidak ditemukan — akan dibuat pada save.');
     } else {
       currentSha = file.sha;
       currentDB = JSON.parse(b64dec(file.content.replace(/\n/g,'')));
@@ -145,6 +138,7 @@ function renderDbView(){
   wrap.appendChild(container);
 }
 
+// UI bind
 document.getElementById('saveBtn').addEventListener('click', ()=>{
   const owner = document.getElementById('owner').value.trim();
   const repo  = document.getElementById('repo').value.trim();
@@ -162,12 +156,10 @@ document.getElementById('genCodeBtn').addEventListener('click', async ()=>{
     if(!cfg.token) throw new Error('Load DB config dulu (Save & Load DB).');
     const name = document.getElementById('codeName').value.trim();
     if(!currentDB) await loadDb();
-    // ensure unique
     let code; let attempts=0;
     do { code = genCode(); attempts++; if(attempts>30) throw new Error('Gagal generate kode unik'); } while((currentDB.codes||[]).some(x=>x.code===code));
     currentDB.codes = currentDB.codes || [];
     currentDB.codes.push({ code, name: name || '', created_at: new Date().toISOString(), used:false });
-    // save
     const content = b64enc(JSON.stringify(currentDB, null, 2));
     const res = await ghPut(cfg.owner, cfg.repo, cfg.path, content, 'Generate code ' + code, currentSha, cfg.token, cfg.branch);
     currentSha = res.content.sha;
@@ -208,6 +200,15 @@ window.addEventListener('load', ()=>{
   const saved = localStorage.getItem('admin_db_cfg');
   if(saved){
     try{ cfg = JSON.parse(saved); document.getElementById('owner').value = cfg.owner; document.getElementById('repo').value = cfg.repo; document.getElementById('path').value = cfg.path; document.getElementById('branch').value = cfg.branch || 'main'; document.getElementById('token').value = cfg.token; loadDb(); }catch(e){ console.warn(e); }
+  } else {
+    // auto-load the prefilled cfg we set at top
+    document.getElementById('owner').value = cfg.owner;
+    document.getElementById('repo').value = cfg.repo;
+    document.getElementById('path').value = cfg.path;
+    document.getElementById('branch').value = cfg.branch;
+    document.getElementById('token').value = cfg.token;
+    // try auto load once
+    loadDb().catch(()=>{});
   }
 });
 </script>
