@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Admin (Generate Access Code) — WORKING</title>
+<style>
+  body{font-family:Inter,Arial,system-ui;background:#0b1220;color:#e6eef8;padding:18px}
+  .wrap{max-width:980px;margin:0 auto}
+  .card{background:#0f172a;padding:16px;border-radius:12px}
+  input,button,textarea{padding:8px;border-radius:8px;border:1px solid #1f2937;background:transparent;color:#e6eef8}
+  .row{display:grid;grid-template-columns:1fr 220px;gap:10px}
+  .list{background:#07102a;padding:8px;border-radius:8px;margin-top:10px;max-height:380px;overflow:auto}
+  .item{padding:8px;border-bottom:1px solid rgba(255,255,255,0.03);display:flex;justify-content:space-between;gap:8px;align-items:center}
+  .btn{background:#7c3aed;color:white;padding:8px;border-radius:8px;border:0;cursor:pointer}
+  .btn2{background:#111827;color:white;padding:8px;border-radius:8px;border:0;cursor:pointer}
+  .muted{color:#94a3b8}
+  .small{font-size:13px;color:#c7d2fe}
+  pre{white-space:pre-wrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h2>Admin Panel — Generate 1 Kode Akses (WORKING)</h2>
+    <p class="muted">Admin ini akan <strong>memuat settings.js dari repo lain</strong> (raw URL). settings.js harus mendefinisikan: <code>window.GITHUB_OWNER</code>, <code>window.GITHUB_REPO</code>, <code>window.GITHUB_PATH</code> (path ke database.json), <code>window.GITHUB_TOKEN</code>. Setelah dimuat, admin akan membaca / menulis <code>database.json</code> di repo yang dikonfigurasi oleh settings.js.</p>
+
+    <label>Settings JS (raw URL) — contoh: <span class="small">https://raw.githubusercontent.com/ORG/REPO/BRANCH/path/settings.js</span></label>
+    <div style="display:flex;gap:8px">
+      <input id="settingsUrl" placeholder="Paste raw settings.js URL di sini" />
+      <button id="loadSettings" class="btn">Load Settings</button>
+    </div>
+    <div id="settingsStatus" class="muted" style="margin-top:8px">Settings belum dimuat.</div>
+
+    <hr style="margin:12px 0;border:none;border-top:1px solid rgba(255,255,255,0.03)">
+
+    <label>Nama penerima (boleh kosong untuk kode umum)</label>
+    <div style="display:flex;gap:8px">
+      <input id="nameInput" placeholder="Nama penerima (optional)" />
+      <button id="genBtn" class="btn">Generate 1 Kode</button>
+      <button id="loadDbBtn" class="btn2">Load DB</button>
+    </div>
+    <div id="genInfo" style="margin-top:8px" class="muted">&nbsp;</div>
+
+    <div style="display:flex;gap:12px;margin-top:12px">
+      <div style="flex:1">
+        <h4 class="small">Access Codes (database.codes)</h4>
+        <div id="codesList" class="list">(belum dimuat)</div>
+      </div>
+      <div style="flex:1">
+        <h4 class="small">Accounts (database.accounts)</h4>
+        <div id="accountsList" class="list">(belum dimuat)</div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button id="exportBtn" class="btn2">Export database.json</button>
+      <button id="cleanupBtn" class="btn2">Cleanup expired</button>
+      <button id="clearOverrides" class="btn2">Clear saved Settings URL</button>
+    </div>
+
+    <div id="log" style="margin-top:12px;color:#c7d2fe"></div>
+  </div>
+</div>
+
+<script>
+/* ADMIN (WORKING)
+ - load settings.js from other repo (raw URL). settings.js must set:
+   window.GITHUB_OWNER, window.GITHUB_REPO, window.GITHUB_PATH, window.GITHUB_TOKEN
+ - uses those to GET/PUT database.json via GitHub REST API contents endpoint
+ - generates one code per click: format 'lf' + 5 alnum (total 7)
+ - marks codes saved to database.json (codes array). accounts array untouched here.
+ - stores settings_url to localStorage for convenience
+*/
+
+const API_BASE = 'https://api.github.com/repos';
+const STORAGE_KEY = 'admin_settings_url';
+
+// helpers
+function log(msg){ const el = document.getElementById('log'); el.innerHTML = `${(new Date()).toLocaleString()} — ${msg}<br/>` + el.innerHTML; }
+function base64Encode(s){ return btoa(unescape(encodeURIComponent(s))); }
+function base64Decode(b){ try { return decodeURIComponent(escape(atob(b))); } catch(e){ return atob(b); } }
+
+function saveSettingsUrl(url){ if(url) localStorage.setItem(STORAGE_KEY, url); else localStorage.removeItem(STORAGE_KEY); }
+function getSavedSettingsUrl(){ return localStorage.getItem(STORAGE_KEY) || ''; }
+
+async function loadRemoteSettings(url){
+  const res = await fetch(url);
+  if(!res.ok) throw new Error('Gagal fetch settings.js (HTTP ' + res.status + ')');
+  const js = await res.text();
+  // eval in global scope
+  (0, eval)(js);
+  saveSettingsUrl(url);
+  return true;
+}
+
+// GitHub helpers (uses window.GITHUB_* from loaded settings.js)
+async function ghGet(owner, repo, path, token){
+  const url = `${API_BASE}/${owner}/${repo}/contents/${encodeURIComponent(path)}`;
+  const res = await fetch(url, { headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.v3+json' }});
+  if(res.status === 404) return null;
+  if(!res.ok) throw new Error('GitHub GET error: ' + res.status + ' ' + await res.text());
+  return await res.json();
+}
+async function ghPut(owner, repo, path, contentB64, message, sha, token, branch){
+  const url = `${API_BASE}/${owner}/${repo}/contents/${encodeURIComponent(path)}`;
+  const body = { message, content: contentB64, branch };
+  if(sha) body.sha = sha;
+  const res = await fetch(url, { method: 'PUT', headers: { 'Authorization': 'token ' + token, 'Accept':'application/vnd.github.v3+json', 'Content-Type':'application/json' }, body: JSON.stringify(body) });
+  if(!res.ok) throw new Error('GitHub PUT error: ' + res.status + ' ' + await res.text());
+  return await res.json();
+}
+
+// generate unique code
+function genCode(){
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  let s = 'lf';
+  for(let i=0;i<5;i++) s += chars.charAt(Math.floor(Math.random()*chars.length));
+  return s;
+}
+
+let currentDB = { codes:[], accounts:[] };
+let currentSha = null;
+
+// render functions
+function renderCodes(){
+  const el = document.getElementById('codesList'); el.innerHTML = '';
+  const arr = currentDB.codes || [];
+  if(arr.length === 0) { el.innerHTML = '<div class="small muted">Kosong</div>'; return; }
+  arr.slice().reverse().forEach(c=>{
+    const d = document.createElement('div'); d.className = 'item';
+    d.innerHTML = `<div>
+      <div style="font-weight:700">${c.code} ${c.used?'<span style="color:#fca5a5">(used)</span>':''}</div>
+      <div class="small">for: ${c.name||'-'} • ${c.created_at||'-'}</div>
+    </div>
+    <div style="display:flex;gap:6px">
+      <button class="btn2" onclick="copyText('${c.code}')">Copy</button>
+      <button class="btn2" onclick="removeCode('${c.code}')">Delete</button>
+    </div>`;
+    el.appendChild(d);
+  });
+}
+function renderAccounts(){
+  const el = document.getElementById('accountsList'); el.innerHTML = '';
+  const arr = currentDB.accounts || [];
+  if(arr.length === 0) { el.innerHTML = '<div class="small muted">Kosong</div>'; return; }
+  arr.slice().reverse().forEach(a=>{
+    const d = document.createElement('div'); d.className = 'item';
+    d.innerHTML = `<div>
+      <div style="font-weight:700">${a.name||'-'}</div>
+      <div class="small">${a.email||'-'} • ${a.wa||'-'}</div>
+      <div class="small">ID:${a.id||'-'} • Expires: ${a.expires_at||'-'}</div>
+    </div>
+    <div style="display:flex;gap:6px">
+      <button class="btn2" onclick="deleteAccount('${a.id}')">Delete</button>
+    </div>`;
+    el.appendChild(d);
+  });
+}
+
+// expose small helpers to window for buttons
+window.copyText = (t) => { navigator.clipboard?.writeText(t).then(()=> log('Copied ' + t)); };
+window.removeCode = async (code) => {
+  if(!confirm('Hapus kode '+code+'?')) return;
+  currentDB.codes = (currentDB.codes||[]).filter(c=>c.code!==code);
+  await saveDb('Delete code ' + code);
+};
+window.deleteAccount = async (id) => {
+  if(!confirm('Hapus akun '+id+'?')) return;
+  currentDB.accounts = (currentDB.accounts||[]).filter(a=>a.id!==id);
+  await saveDb('Delete account ' + id);
+};
+
+async function loadDbFromGit(){
+  const owner = window.GITHUB_OWNER || '';
+  const repo  = window.GITHUB_REPO || '';
+  const path  = window.GITHUB_PATH || 'database.json';
+  const token = window.GITHUB_TOKEN || '';
+  if(!owner || !repo || !token) throw new Error('settings.js tidak lengkap (owner/repo/token).');
+  document.getElementById('settingsStatus').textContent = `Memuat database.json dari ${owner}/${repo}/${path} ...`;
+  const file = await ghGet(owner, repo, path, token);
+  if(!file){
+    currentDB = { codes:[], accounts:[] }; currentSha = null;
+    log('database.json tidak ditemukan — akan dibuat pada saat simpan pertama.');
+  } else {
+    currentSha = file.sha;
+    const text = base64Decode(file.content.replace(/\n/g,''));
+    currentDB = JSON.parse(text);
+    currentDB.codes = currentDB.codes || [];
+    currentDB.accounts = currentDB.accounts || [];
+    log('DB dimuat — codes:' + currentDB.codes.length + ', accounts:' + currentDB.accounts.length);
+  }
+  renderCodes(); renderAccounts();
+  document.getElementById('settingsStatus').textContent = `DB dimuat — codes:${currentDB.codes.length} accounts:${currentDB.accounts.length}`;
+}
+
+async function saveDb(message){
+  const owner = window.GITHUB_OWNER || '';
+  const repo  = window.GITHUB_REPO || '';
+  const path  = window.GITHUB_PATH || 'database.json';
+  const token = window.GITHUB_TOKEN || '';
+  if(!owner || !repo || !token) throw new Error('settings.js tidak lengkap (owner/repo/token).');
+  const content = base64Encode(JSON.stringify(currentDB, null, 2));
+  document.getElementById('genInfo').textContent = 'Menyimpan ke GitHub...';
+  log('Menyimpan DB ke ' + owner + '/' + repo + '/' + path);
+  const res = await ghPut(owner, repo, path, content, message || 'Update database.json via admin', currentSha, token, window.GITHUB_BRANCH || 'main');
+  currentSha = res.content.sha;
+  log('Tersimpan — sha: ' + currentSha);
+  await loadDbFromGit();
+  document.getElementById('genInfo').textContent = 'Tersimpan.';
+}
+
+function cleanExpired(){
+  const now = Date.now();
+  currentDB.accounts = (currentDB.accounts||[]).filter(a=>{
+    if(!a.expires_at) return true;
+    const t = Date.parse(a.expires_at);
+    return isNaN(t) ? true : t > now;
+  });
+}
+
+// UI handlers
+document.getElementById('loadSettings').addEventListener('click', async ()=>{
+  const url = (document.getElementById('settingsUrl').value||'').trim();
+  if(!url){ alert('Masukkan raw settings.js URL'); return; }
+  document.getElementById('settingsStatus').textContent = 'Loading settings...';
+  try{
+    await loadRemoteSettings(url);
+    document.getElementById('settingsStatus').textContent = 'Settings dimuat dari: ' + url;
+    log('Settings dimuat dari ' + url);
+    // store url in input
+    document.getElementById('settingsUrl').value = url;
+    // try load DB automatically
+    await loadDbFromGit();
+  }catch(err){
+    alert('Gagal load settings.js: ' + err.message);
+    document.getElementById('settingsStatus').textContent = 'Gagal load settings: ' + err.message;
+    log('Load settings error: ' + err.message);
+  }
+});
+
+// auto-fill settingsUrl if saved
+window.addEventListener('load', ()=>{
+  const saved = getSavedSettingsUrl();
+  if(saved) document.getElementById('settingsUrl').value = saved;
+  // if settings already present in window (maybe settings.js locally), attempt autoload DB
+  if(window.GITHUB_OWNER && window.GITHUB_REPO && window.GITHUB_TOKEN){
+    document.getElementById('settingsStatus').textContent = 'Settings ditemukan di window.* (lokal). Memuat DB...';
+    loadDbFromGit().catch(e => log('Auto load DB failed: ' + e.message));
+  } else if(saved){
+    // auto-fetch saved URL
+    (async ()=>{ try{ await loadRemoteSettings(saved); document.getElementById('settingsStatus').textContent = 'Settings dimuat otomatis.'; await loadDbFromGit(); }catch(e){ log('Auto-load settings failed: ' + e.message); } })();
+  }
+});
+
+document.getElementById('genBtn').addEventListener('click', async ()=>{
+  const name = (document.getElementById('nameInput').value||'').trim();
+  try{
+    if(!window.GITHUB_OWNER || !window.GITHUB_REPO || !window.GITHUB_TOKEN) throw new Error('Settings belum dimuat (owner/repo/token).');
+    // ensure DB loaded
+    if(!currentDB) await loadDbFromGit();
+    // generate unique code
+    let code; let tries=0;
+    do { code = genCode(); tries++; if(tries>30) throw new Error('Tidak bisa generate kode unik'); } while((currentDB.codes||[]).some(c=>c.code === code));
+    const entry = { code, name: name || '', created_at: (new Date()).toISOString(), used: false };
+    currentDB.codes = currentDB.codes || [];
+    currentDB.codes.push(entry);
+    await saveDb('Generate code ' + code);
+    document.getElementById('genInfo').innerHTML = `<span style="color:#86efac">Kode dibuat: <strong>${code}</strong></span>`;
+    document.getElementById('nameInput').value = '';
+  }catch(err){
+    alert('Error: ' + err.message);
+    log('Generate error: ' + err.message);
+  }
+});
+
+document.getElementById('loadDbBtn').addEventListener('click', ()=> loadDbFromGit().catch(e=> alert('Load DB error: '+e.message)));
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(currentDB, null, 2)], { type:'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'database.json'; a.click(); URL.revokeObjectURL(a.href);
+});
+document.getElementById('cleanupBtn').addEventListener('click', async ()=>{
+  cleanExpired();
+  await saveDb('Cleanup expired accounts');
+  alert('Cleanup selesai');
+});
+document.getElementById('clearOverrides').addEventListener('click', ()=>{
+  saveSettingsUrl('');
+  localStorage.removeItem('cfg_GITHUB_TOKEN');
+  document.getElementById('settingsUrl').value = '';
+  document.getElementById('settingsStatus').textContent = 'Overrides cleared.';
+  log('Cleared saved settings URL & local token');
+});
+</script>
+</body>
+</html>
