@@ -1,103 +1,83 @@
 <!doctype html>
 <html lang="id">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Admin (Generate Access Code) — WORKING</title>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Admin Panel — DB Manager (WORKING)</title>
 <style>
   body{font-family:Inter,Arial,system-ui;background:#0b1220;color:#e6eef8;padding:18px}
-  .wrap{max-width:980px;margin:0 auto}
+  .wrap{max-width:1000px;margin:0 auto}
   .card{background:#0f172a;padding:16px;border-radius:12px}
-  input,button,textarea{padding:8px;border-radius:8px;border:1px solid #1f2937;background:transparent;color:#e6eef8}
+  input,textarea,button{padding:8px;border-radius:8px;border:1px solid #1f2937;background:transparent;color:#e6eef8;width:100%}
   .row{display:grid;grid-template-columns:1fr 220px;gap:10px}
-  .list{background:#07102a;padding:8px;border-radius:8px;margin-top:10px;max-height:380px;overflow:auto}
-  .item{padding:8px;border-bottom:1px solid rgba(255,255,255,0.03);display:flex;justify-content:space-between;gap:8px;align-items:center}
+  .list{background:#07102a;padding:8px;border-radius:8px;margin-top:10px;max-height:360px;overflow:auto}
   .btn{background:#7c3aed;color:white;padding:8px;border-radius:8px;border:0;cursor:pointer}
-  .btn2{background:#111827;color:white;padding:8px;border-radius:8px;border:0;cursor:pointer}
   .muted{color:#94a3b8}
-  .small{font-size:13px;color:#c7d2fe}
-  pre{white-space:pre-wrap}
+  pre{white-space:pre-wrap;background:#07102a;padding:10px;border-radius:8px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="card">
-    <h2>Admin Panel — Generate 1 Kode Akses (WORKING)</h2>
-    <p class="muted">Admin ini akan <strong>memuat settings.js dari repo lain</strong> (raw URL). settings.js harus mendefinisikan: <code>window.GITHUB_OWNER</code>, <code>window.GITHUB_REPO</code>, <code>window.GITHUB_PATH</code> (path ke database.json), <code>window.GITHUB_TOKEN</code>. Setelah dimuat, admin akan membaca / menulis <code>database.json</code> di repo yang dikonfigurasi oleh settings.js.</p>
+    <h2>Admin Panel — DB Manager</h2>
+    <p class="muted">Masukkan DB repo info + token untuk memuat & mengubah database.json (private repo).</p>
 
-    <label>Settings JS (raw URL) — contoh: <span class="small">https://raw.githubusercontent.com/ORG/REPO/BRANCH/path/settings.js</span></label>
-    <div style="display:flex;gap:8px">
-      <input id="settingsUrl" placeholder="Paste raw settings.js URL di sini" />
-      <button id="loadSettings" class="btn">Load Settings</button>
+    <div class="row">
+      <input id="owner" placeholder="DB owner (username/org)" />
+      <input id="repo" placeholder="DB repo name" />
     </div>
-    <div id="settingsStatus" class="muted" style="margin-top:8px">Settings belum dimuat.</div>
-
-    <hr style="margin:12px 0;border:none;border-top:1px solid rgba(255,255,255,0.03)">
-
-    <label>Nama penerima (boleh kosong untuk kode umum)</label>
-    <div style="display:flex;gap:8px">
-      <input id="nameInput" placeholder="Nama penerima (optional)" />
-      <button id="genBtn" class="btn">Generate 1 Kode</button>
-      <button id="loadDbBtn" class="btn2">Load DB</button>
+    <div class="row" style="margin-top:8px">
+      <input id="path" placeholder="Path to database.json (eg: database.json)" />
+      <input id="branch" placeholder="Branch (main)" value="main" />
     </div>
-    <div id="genInfo" style="margin-top:8px" class="muted">&nbsp;</div>
-
-    <div style="display:flex;gap:12px;margin-top:12px">
-      <div style="flex:1">
-        <h4 class="small">Access Codes (database.codes)</h4>
-        <div id="codesList" class="list">(belum dimuat)</div>
-      </div>
-      <div style="flex:1">
-        <h4 class="small">Accounts (database.accounts)</h4>
-        <div id="accountsList" class="list">(belum dimuat)</div>
-      </div>
+    <div style="margin-top:8px;display:flex;gap:8px">
+      <input id="token" placeholder="GitHub token (fine-grained)"/>
+      <button id="saveBtn" class="btn">Save & Load DB</button>
     </div>
 
     <div style="margin-top:12px;display:flex;gap:8px">
-      <button id="exportBtn" class="btn2">Export database.json</button>
-      <button id="cleanupBtn" class="btn2">Cleanup expired</button>
-      <button id="clearOverrides" class="btn2">Clear saved Settings URL</button>
+      <input id="codeName" placeholder="Nama penerima (optional)" />
+      <button id="genCodeBtn" class="btn">Generate 1 Kode</button>
+      <button id="editDbBtn" class="btn" style="background:#111827">Edit Database</button>
+      <button id="exportBtn" class="btn" style="background:#111827">Export JSON</button>
     </div>
 
-    <div id="log" style="margin-top:12px;color:#c7d2fe"></div>
+    <div id="status" class="muted" style="margin-top:8px"></div>
+
+    <h3 style="margin-top:12px">Database preview</h3>
+    <div id="dbView" class="list"><div class="muted">DB belum dimuat</div></div>
+
+    <div id="editorWrap" style="display:none;margin-top:12px">
+      <h4>Edit database.json</h4>
+      <textarea id="dbEditor" rows="14" style="width:100%"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="saveDbBtn" class="btn">Save DB</button>
+        <button id="cancelEdit" class="btn" style="background:#111827">Cancel</button>
+      </div>
+    </div>
   </div>
 </div>
 
 <script>
-/* ADMIN (WORKING)
- - load settings.js from other repo (raw URL). settings.js must set:
-   window.GITHUB_OWNER, window.GITHUB_REPO, window.GITHUB_PATH, window.GITHUB_TOKEN
- - uses those to GET/PUT database.json via GitHub REST API contents endpoint
- - generates one code per click: format 'lf' + 5 alnum (total 7)
- - marks codes saved to database.json (codes array). accounts array untouched here.
- - stores settings_url to localStorage for convenience
+/* Admin UI (WORKING)
+ - admin inputs repo owner, repo, path, branch, token
+ - Load DB (GET), show preview
+ - Generate code (lf + 5 alnum) -> append to db.codes -> PUT
+ - Edit DB: show textarea -> save -> PUT
 */
 
+function b64enc(s){ return btoa(unescape(encodeURIComponent(s))); }
+function b64dec(b){ try{ return decodeURIComponent(escape(atob(b))); }catch(e){ return atob(b); } }
 const API_BASE = 'https://api.github.com/repos';
-const STORAGE_KEY = 'admin_settings_url';
 
-// helpers
-function log(msg){ const el = document.getElementById('log'); el.innerHTML = `${(new Date()).toLocaleString()} — ${msg}<br/>` + el.innerHTML; }
-function base64Encode(s){ return btoa(unescape(encodeURIComponent(s))); }
-function base64Decode(b){ try { return decodeURIComponent(escape(atob(b))); } catch(e){ return atob(b); } }
+let currentDB = null;
+let currentSha = null;
+let cfg = {};
 
-function saveSettingsUrl(url){ if(url) localStorage.setItem(STORAGE_KEY, url); else localStorage.removeItem(STORAGE_KEY); }
-function getSavedSettingsUrl(){ return localStorage.getItem(STORAGE_KEY) || ''; }
+function setStatus(t){ document.getElementById('status').textContent = t; }
 
-async function loadRemoteSettings(url){
-  const res = await fetch(url);
-  if(!res.ok) throw new Error('Gagal fetch settings.js (HTTP ' + res.status + ')');
-  const js = await res.text();
-  // eval in global scope
-  (0, eval)(js);
-  saveSettingsUrl(url);
-  return true;
-}
-
-// GitHub helpers (uses window.GITHUB_* from loaded settings.js)
 async function ghGet(owner, repo, path, token){
   const url = `${API_BASE}/${owner}/${repo}/contents/${encodeURIComponent(path)}`;
-  const res = await fetch(url, { headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.v3+json' }});
+  const res = await fetch(url, { headers: { 'Authorization':'token '+token, 'Accept':'application/vnd.github.v3+json' }});
   if(res.status === 404) return null;
   if(!res.ok) throw new Error('GitHub GET error: ' + res.status + ' ' + await res.text());
   return await res.json();
@@ -106,12 +86,11 @@ async function ghPut(owner, repo, path, contentB64, message, sha, token, branch)
   const url = `${API_BASE}/${owner}/${repo}/contents/${encodeURIComponent(path)}`;
   const body = { message, content: contentB64, branch };
   if(sha) body.sha = sha;
-  const res = await fetch(url, { method: 'PUT', headers: { 'Authorization': 'token ' + token, 'Accept':'application/vnd.github.v3+json', 'Content-Type':'application/json' }, body: JSON.stringify(body) });
+  const res = await fetch(url, { method:'PUT', headers:{ 'Authorization':'token '+token, 'Accept':'application/vnd.github.v3+json', 'Content-Type':'application/json' }, body: JSON.stringify(body) });
   if(!res.ok) throw new Error('GitHub PUT error: ' + res.status + ' ' + await res.text());
   return await res.json();
 }
 
-// generate unique code
 function genCode(){
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   let s = 'lf';
@@ -119,177 +98,117 @@ function genCode(){
   return s;
 }
 
-let currentDB = { codes:[], accounts:[] };
-let currentSha = null;
-
-// render functions
-function renderCodes(){
-  const el = document.getElementById('codesList'); el.innerHTML = '';
-  const arr = currentDB.codes || [];
-  if(arr.length === 0) { el.innerHTML = '<div class="small muted">Kosong</div>'; return; }
-  arr.slice().reverse().forEach(c=>{
-    const d = document.createElement('div'); d.className = 'item';
-    d.innerHTML = `<div>
-      <div style="font-weight:700">${c.code} ${c.used?'<span style="color:#fca5a5">(used)</span>':''}</div>
-      <div class="small">for: ${c.name||'-'} • ${c.created_at||'-'}</div>
-    </div>
-    <div style="display:flex;gap:6px">
-      <button class="btn2" onclick="copyText('${c.code}')">Copy</button>
-      <button class="btn2" onclick="removeCode('${c.code}')">Delete</button>
-    </div>`;
-    el.appendChild(d);
-  });
-}
-function renderAccounts(){
-  const el = document.getElementById('accountsList'); el.innerHTML = '';
-  const arr = currentDB.accounts || [];
-  if(arr.length === 0) { el.innerHTML = '<div class="small muted">Kosong</div>'; return; }
-  arr.slice().reverse().forEach(a=>{
-    const d = document.createElement('div'); d.className = 'item';
-    d.innerHTML = `<div>
-      <div style="font-weight:700">${a.name||'-'}</div>
-      <div class="small">${a.email||'-'} • ${a.wa||'-'}</div>
-      <div class="small">ID:${a.id||'-'} • Expires: ${a.expires_at||'-'}</div>
-    </div>
-    <div style="display:flex;gap:6px">
-      <button class="btn2" onclick="deleteAccount('${a.id}')">Delete</button>
-    </div>`;
-    el.appendChild(d);
-  });
-}
-
-// expose small helpers to window for buttons
-window.copyText = (t) => { navigator.clipboard?.writeText(t).then(()=> log('Copied ' + t)); };
-window.removeCode = async (code) => {
-  if(!confirm('Hapus kode '+code+'?')) return;
-  currentDB.codes = (currentDB.codes||[]).filter(c=>c.code!==code);
-  await saveDb('Delete code ' + code);
-};
-window.deleteAccount = async (id) => {
-  if(!confirm('Hapus akun '+id+'?')) return;
-  currentDB.accounts = (currentDB.accounts||[]).filter(a=>a.id!==id);
-  await saveDb('Delete account ' + id);
-};
-
-async function loadDbFromGit(){
-  const owner = window.GITHUB_OWNER || '';
-  const repo  = window.GITHUB_REPO || '';
-  const path  = window.GITHUB_PATH || 'database.json';
-  const token = window.GITHUB_TOKEN || '';
-  if(!owner || !repo || !token) throw new Error('settings.js tidak lengkap (owner/repo/token).');
-  document.getElementById('settingsStatus').textContent = `Memuat database.json dari ${owner}/${repo}/${path} ...`;
-  const file = await ghGet(owner, repo, path, token);
-  if(!file){
-    currentDB = { codes:[], accounts:[] }; currentSha = null;
-    log('database.json tidak ditemukan — akan dibuat pada saat simpan pertama.');
-  } else {
-    currentSha = file.sha;
-    const text = base64Decode(file.content.replace(/\n/g,''));
-    currentDB = JSON.parse(text);
-    currentDB.codes = currentDB.codes || [];
-    currentDB.accounts = currentDB.accounts || [];
-    log('DB dimuat — codes:' + currentDB.codes.length + ', accounts:' + currentDB.accounts.length);
-  }
-  renderCodes(); renderAccounts();
-  document.getElementById('settingsStatus').textContent = `DB dimuat — codes:${currentDB.codes.length} accounts:${currentDB.accounts.length}`;
-}
-
-async function saveDb(message){
-  const owner = window.GITHUB_OWNER || '';
-  const repo  = window.GITHUB_REPO || '';
-  const path  = window.GITHUB_PATH || 'database.json';
-  const token = window.GITHUB_TOKEN || '';
-  if(!owner || !repo || !token) throw new Error('settings.js tidak lengkap (owner/repo/token).');
-  const content = base64Encode(JSON.stringify(currentDB, null, 2));
-  document.getElementById('genInfo').textContent = 'Menyimpan ke GitHub...';
-  log('Menyimpan DB ke ' + owner + '/' + repo + '/' + path);
-  const res = await ghPut(owner, repo, path, content, message || 'Update database.json via admin', currentSha, token, window.GITHUB_BRANCH || 'main');
-  currentSha = res.content.sha;
-  log('Tersimpan — sha: ' + currentSha);
-  await loadDbFromGit();
-  document.getElementById('genInfo').textContent = 'Tersimpan.';
-}
-
-function cleanExpired(){
-  const now = Date.now();
-  currentDB.accounts = (currentDB.accounts||[]).filter(a=>{
-    if(!a.expires_at) return true;
-    const t = Date.parse(a.expires_at);
-    return isNaN(t) ? true : t > now;
-  });
-}
-
-// UI handlers
-document.getElementById('loadSettings').addEventListener('click', async ()=>{
-  const url = (document.getElementById('settingsUrl').value||'').trim();
-  if(!url){ alert('Masukkan raw settings.js URL'); return; }
-  document.getElementById('settingsStatus').textContent = 'Loading settings...';
+async function loadDb(){
   try{
-    await loadRemoteSettings(url);
-    document.getElementById('settingsStatus').textContent = 'Settings dimuat dari: ' + url;
-    log('Settings dimuat dari ' + url);
-    // store url in input
-    document.getElementById('settingsUrl').value = url;
-    // try load DB automatically
-    await loadDbFromGit();
+    setStatus('Loading DB...');
+    const file = await ghGet(cfg.owner, cfg.repo, cfg.path, cfg.token);
+    if(!file){
+      currentDB = { codes: [], accounts: [] };
+      currentSha = null;
+      setStatus('DB not found — will be created on save.');
+    } else {
+      currentSha = file.sha;
+      currentDB = JSON.parse(b64dec(file.content.replace(/\n/g,'')));
+      currentDB.codes = currentDB.codes || [];
+      currentDB.accounts = currentDB.accounts || [];
+      setStatus(`Loaded DB — codes: ${currentDB.codes.length}, accounts: ${currentDB.accounts.length}`);
+    }
+    renderDbView();
   }catch(err){
-    alert('Gagal load settings.js: ' + err.message);
-    document.getElementById('settingsStatus').textContent = 'Gagal load settings: ' + err.message;
-    log('Load settings error: ' + err.message);
+    setStatus('Error load DB: '+err.message);
+    console.error(err);
   }
+}
+
+function renderDbView(){
+  const wrap = document.getElementById('dbView'); wrap.innerHTML = '';
+  if(!currentDB){ wrap.innerHTML = '<div class="muted">DB belum dimuat</div>'; return; }
+  const codes = (currentDB.codes||[]).slice().reverse();
+  const accounts = (currentDB.accounts||[]).slice().reverse();
+
+  const left = document.createElement('div'); left.style.marginBottom='8px';
+  left.innerHTML = `<div style="font-weight:700">Codes (${codes.length})</div>`;
+  codes.forEach(c=>{
+    const d = document.createElement('div'); d.style.padding='6px 0'; d.innerHTML = `<strong>${c.code}</strong> ${c.used?'<span style="color:#fca5a5">(used)</span>':''} <div class="muted">for: ${c.name||'-'} • ${c.created_at||''}</div>`;
+    left.appendChild(d);
+  });
+
+  const right = document.createElement('div');
+  right.innerHTML = `<div style="font-weight:700;margin-top:8px">Accounts (${accounts.length})</div>`;
+  accounts.forEach(a=>{
+    const d = document.createElement('div'); d.style.padding='6px 0'; d.innerHTML = `<strong>${a.name || '-'}</strong> <div class="muted">${a.email||'-'} • ${a.wa||'-'} • Exp: ${a.expires_at||'-'}</div>`;
+    right.appendChild(d);
+  });
+
+  const container = document.createElement('div'); container.style.display='grid'; container.style.gridTemplateColumns='1fr 1fr'; container.style.gap='12px';
+  container.appendChild(left); container.appendChild(right);
+  wrap.appendChild(container);
+}
+
+document.getElementById('saveBtn').addEventListener('click', ()=>{
+  const owner = document.getElementById('owner').value.trim();
+  const repo  = document.getElementById('repo').value.trim();
+  const path  = document.getElementById('path').value.trim() || 'database.json';
+  const branch= document.getElementById('branch').value.trim() || 'main';
+  const token = document.getElementById('token').value.trim();
+  if(!owner||!repo||!token) { alert('Isi owner, repo, token'); return; }
+  cfg = { owner, repo, path, branch, token };
+  localStorage.setItem('admin_db_cfg', JSON.stringify(cfg));
+  loadDb();
 });
 
-// auto-fill settingsUrl if saved
-window.addEventListener('load', ()=>{
-  const saved = getSavedSettingsUrl();
-  if(saved) document.getElementById('settingsUrl').value = saved;
-  // if settings already present in window (maybe settings.js locally), attempt autoload DB
-  if(window.GITHUB_OWNER && window.GITHUB_REPO && window.GITHUB_TOKEN){
-    document.getElementById('settingsStatus').textContent = 'Settings ditemukan di window.* (lokal). Memuat DB...';
-    loadDbFromGit().catch(e => log('Auto load DB failed: ' + e.message));
-  } else if(saved){
-    // auto-fetch saved URL
-    (async ()=>{ try{ await loadRemoteSettings(saved); document.getElementById('settingsStatus').textContent = 'Settings dimuat otomatis.'; await loadDbFromGit(); }catch(e){ log('Auto-load settings failed: ' + e.message); } })();
-  }
-});
-
-document.getElementById('genBtn').addEventListener('click', async ()=>{
-  const name = (document.getElementById('nameInput').value||'').trim();
+document.getElementById('genCodeBtn').addEventListener('click', async ()=>{
   try{
-    if(!window.GITHUB_OWNER || !window.GITHUB_REPO || !window.GITHUB_TOKEN) throw new Error('Settings belum dimuat (owner/repo/token).');
-    // ensure DB loaded
-    if(!currentDB) await loadDbFromGit();
-    // generate unique code
-    let code; let tries=0;
-    do { code = genCode(); tries++; if(tries>30) throw new Error('Tidak bisa generate kode unik'); } while((currentDB.codes||[]).some(c=>c.code === code));
-    const entry = { code, name: name || '', created_at: (new Date()).toISOString(), used: false };
+    if(!cfg.token) throw new Error('Load DB config dulu (Save & Load DB).');
+    const name = document.getElementById('codeName').value.trim();
+    if(!currentDB) await loadDb();
+    // ensure unique
+    let code; let attempts=0;
+    do { code = genCode(); attempts++; if(attempts>30) throw new Error('Gagal generate kode unik'); } while((currentDB.codes||[]).some(x=>x.code===code));
     currentDB.codes = currentDB.codes || [];
-    currentDB.codes.push(entry);
-    await saveDb('Generate code ' + code);
-    document.getElementById('genInfo').innerHTML = `<span style="color:#86efac">Kode dibuat: <strong>${code}</strong></span>`;
-    document.getElementById('nameInput').value = '';
-  }catch(err){
-    alert('Error: ' + err.message);
-    log('Generate error: ' + err.message);
-  }
+    currentDB.codes.push({ code, name: name || '', created_at: new Date().toISOString(), used:false });
+    // save
+    const content = b64enc(JSON.stringify(currentDB, null, 2));
+    const res = await ghPut(cfg.owner, cfg.repo, cfg.path, content, 'Generate code ' + code, currentSha, cfg.token, cfg.branch);
+    currentSha = res.content.sha;
+    await loadDb();
+    alert('Kode dibuat: ' + code);
+  }catch(err){ alert('Error: ' + err.message); console.error(err); }
 });
 
-document.getElementById('loadDbBtn').addEventListener('click', ()=> loadDbFromGit().catch(e=> alert('Load DB error: '+e.message)));
+document.getElementById('editDbBtn').addEventListener('click', ()=>{
+  if(!currentDB){ alert('Load DB dulu'); return; }
+  document.getElementById('editorWrap').style.display = 'block';
+  document.getElementById('dbEditor').value = JSON.stringify(currentDB, null, 2);
+});
+
+document.getElementById('cancelEdit').addEventListener('click', ()=>{ document.getElementById('editorWrap').style.display='none'; });
+
+document.getElementById('saveDbBtn').addEventListener('click', async ()=>{
+  try{
+    const text = document.getElementById('dbEditor').value;
+    const parsed = JSON.parse(text);
+    const content = b64enc(JSON.stringify(parsed, null, 2));
+    const res = await ghPut(cfg.owner, cfg.repo, cfg.path, content, 'Manual edit DB via admin', currentSha, cfg.token, cfg.branch);
+    currentSha = res.content.sha;
+    document.getElementById('editorWrap').style.display = 'none';
+    await loadDb();
+    alert('DB disimpan');
+  }catch(err){ alert('Save error: ' + err.message); console.error(err); }
+});
+
 document.getElementById('exportBtn').addEventListener('click', ()=>{
+  if(!currentDB){ alert('Load DB dulu'); return; }
   const blob = new Blob([JSON.stringify(currentDB, null, 2)], { type:'application/json' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'database.json'; a.click(); URL.revokeObjectURL(a.href);
 });
-document.getElementById('cleanupBtn').addEventListener('click', async ()=>{
-  cleanExpired();
-  await saveDb('Cleanup expired accounts');
-  alert('Cleanup selesai');
-});
-document.getElementById('clearOverrides').addEventListener('click', ()=>{
-  saveSettingsUrl('');
-  localStorage.removeItem('cfg_GITHUB_TOKEN');
-  document.getElementById('settingsUrl').value = '';
-  document.getElementById('settingsStatus').textContent = 'Overrides cleared.';
-  log('Cleared saved settings URL & local token');
+
+// Try load saved cfg on load
+window.addEventListener('load', ()=>{
+  const saved = localStorage.getItem('admin_db_cfg');
+  if(saved){
+    try{ cfg = JSON.parse(saved); document.getElementById('owner').value = cfg.owner; document.getElementById('repo').value = cfg.repo; document.getElementById('path').value = cfg.path; document.getElementById('branch').value = cfg.branch || 'main'; document.getElementById('token').value = cfg.token; loadDb(); }catch(e){ console.warn(e); }
+  }
 });
 </script>
 </body>
