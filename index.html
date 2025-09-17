@@ -166,7 +166,7 @@ function getApiBase(){
     if(local && local.api_base) return local.api_base;
   }catch(e){}
   if(window.API_CONFIG && window.API_CONFIG.API_BASE) return window.API_CONFIG.API_BASE;
-  return 'http://127.0.0.1:3000';
+  return 'http://152.42.204.241:3000';
 }
 function saveApiCfg(apiBase){ localStorage.setItem(LS_API_CFG, JSON.stringify({ api_base: apiBase })); }
 function getAdminKey(){ return localStorage.getItem(LS_ADMIN_KEY) || ''; }
