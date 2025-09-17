@@ -1,214 +1,447 @@
 <!doctype html>
 <html lang="id">
 <head>
-<meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Admin Panel — DB Manager (WORKING)</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Admin Panel — LF</title>
+<link rel="icon" href="data:," />
 <style>
-  body{font-family:Inter,Arial,system-ui;background:#0b1220;color:#e6eef8;padding:18px}
-  .wrap{max-width:1000px;margin:0 auto}
-  .card{background:#0f172a;padding:16px;border-radius:12px}
-  input,textarea,button{padding:8px;border-radius:8px;border:1px solid #1f2937;background:transparent;color:#e6eef8;width:100%}
-  .row{display:grid;grid-template-columns:1fr 220px;gap:10px}
-  .list{background:#07102a;padding:8px;border-radius:8px;margin-top:10px;max-height:360px;overflow:auto}
-  .btn{background:#7c3aed;color:white;padding:8px;border-radius:8px;border:0;cursor:pointer}
-  .muted{color:#94a3b8}
-  pre{white-space:pre-wrap;background:#07102a;padding:10px;border-radius:8px}
+  :root{
+    --bg1:#050216; --bg2:#07102a;
+    --card: rgba(255,255,255,0.03);
+    --accent1: #7c3aed;
+    --accent2: #4f46e5;
+    --muted: #9fb7ff;
+    --text: #e6eef8;
+    --ok: #22c55e;
+    --err: #ff6b6b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;font-family:Inter,system-ui,Segoe UI,Arial;background:linear-gradient(180deg,var(--bg1),var(--bg2));color:var(--text);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1300px;margin:28px auto;padding:20px}
+  .head{display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .brand{display:flex;gap:12px;align-items:center}
+  .logo{width:56px;height:56px;border-radius:12px;background:linear-gradient(90deg,var(--accent1),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:900;box-shadow:0 12px 40px rgba(79,70,229,0.14)}
+  h1{margin:0;font-size:20px}
+  .sub{color:var(--muted);font-size:13px}
+
+  .grid{display:grid;grid-template-columns:1fr 420px;gap:18px;margin-top:18px}
+  .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,0.03);box-shadow:0 12px 40px rgba(2,6,23,0.6)}
+  .row{display:flex;gap:10px;align-items:center}
+  .input{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--text);font-size:14px}
+  .btn{padding:10px 12px;border-radius:10px;border:0;background:linear-gradient(90deg,var(--accent1),var(--accent2));color:white;font-weight:700;cursor:pointer}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+  .small{font-size:13px;color:var(--muted)}
+  .list{max-height:360px;overflow:auto;border-radius:8px;padding:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03)}
+  .item{padding:8px;border-bottom:1px dashed rgba(255,255,255,0.02);display:flex;justify-content:space-between;gap:8px;align-items:center}
+  .kv{font-size:13px;color:#cfe0ff}
+  textarea.input{min-height:320px;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace;resize:vertical}
+
+  /* toast */
+  .toast-wrap{position:fixed;right:20px;bottom:20px;z-index:9999;display:flex;flex-direction:column-reverse;gap:10px;align-items:flex-end}
+  .toast{min-width:220px;padding:10px 12px;border-radius:10px;background:rgba(6,8,20,0.95);border-left:6px solid var(--accent1);color:var(--text);box-shadow:0 10px 30px rgba(3,7,18,0.6);font-weight:600}
+  .toast.ok{border-left-color:var(--ok)}
+  .toast.err{border-left-color:var(--err)}
+
+  /* loading dots */
+  .lds{display:inline-block;width:20px;height:20px}
+  .lds div{display:inline-block;width:6px;height:6px;margin:0 2px;background:#fff;border-radius:50%;animation:ld 1s linear infinite}
+  .lds div:nth-child(2){animation-delay:0.1s}
+  .lds div:nth-child(3){animation-delay:0.2s}
+  @keyframes ld{0%{transform:translateY(0)}50%{transform:translateY(-6px)}100%{transform:translateY(0)}}
+
+  /* responsive */
+  @media (max-width:1100px){
+    .grid{grid-template-columns:1fr}
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="card">
-    <h2>Admin Panel — DB Manager</h2>
-    <p class="muted">DB repo info telah diisi otomatis sesuai data yang diberikan.</p>
-
-    <div class="row">
-      <input id="owner" placeholder="DB owner (username/org)" value="Slownam" />
-      <input id="repo" placeholder="DB repo name" value="databsepanel" />
-    </div>
-    <div class="row" style="margin-top:8px">
-      <input id="path" placeholder="Path to database.json (eg: database.json)" value="database.json" />
-      <input id="branch" placeholder="Branch (main)" value="main" />
-    </div>
-    <div style="margin-top:8px;display:flex;gap:8px">
-      <input id="token" placeholder="GitHub token (fine-grained)" value="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" />
-      <button id="saveBtn" class="btn">Save & Load DB</button>
+  <div class="wrap">
+    <div class="head">
+      <div class="brand">
+        <div class="logo">ADM</div>
+        <div>
+          <h1>Admin Panel — LF</h1>
+          <div class="sub">Kelola kode akses, database.json, dan lihat statistik server</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="btnReload" class="btn ghost">Reload DB</button>
+        <button id="btnExport" class="btn ghost">Export JSON</button>
+      </div>
     </div>
 
-    <div style="margin-top:12px;display:flex;gap:8px">
-      <input id="codeName" placeholder="Nama penerima (optional)" />
-      <button id="genCodeBtn" class="btn">Generate 1 Kode</button>
-      <button id="editDbBtn" class="btn" style="background:#111827">Edit Database</button>
-      <button id="exportBtn" class="btn" style="background:#111827">Export JSON</button>
-    </div>
+    <div class="grid" style="margin-top:18px">
+      <!-- left -->
+      <div>
+        <div class="card">
+          <div style="display:flex;gap:10px;align-items:center">
+            <input id="apiBaseInput" class="input" placeholder="API Base (ex: http://152.42.204.241:3000)" />
+            <input id="adminKeyInput" class="input" placeholder="ADMIN_KEY (disimpan di browser)" />
+            <button id="saveSettingsBtn" class="btn">Simpan</button>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+            <input id="codeName" class="input" placeholder="Nama penerima (optional)" />
+            <input id="codeExpiry" class="input" type="date" />
+            <button id="genCodeBtn" class="btn">🎟️ Generate Kode</button>
+          </div>
 
-    <div id="status" class="muted" style="margin-top:8px"></div>
+          <div style="margin-top:16px;display:flex;gap:8px;align-items:center">
+            <button id="loadDbBtn" class="btn ghost">Load DB</button>
+            <button id="saveDbBtn" class="btn">Save DB</button>
+            <button id="resetDbBtn" class="btn ghost">Reset DB</button>
+            <div style="margin-left:auto" class="small" id="statsMini">—</div>
+          </div>
 
-    <h3 style="margin-top:12px">Database preview</h3>
-    <div id="dbView" class="list"><div class="muted">DB belum dimuat</div></div>
+          <div style="margin-top:12px">
+            <h4 style="margin:0">Editor database.json</h4>
+            <textarea id="dbEditor" class="input" placeholder='{"codes":[],"accounts":[]}'> </textarea>
+            <div style="margin-top:8px;display:flex;gap:8px">
+              <button id="formatBtn" class="btn ghost">Format JSON</button>
+              <button id="applyEditorBtn" class="btn">Apply to DB (Save)</button>
+              <div style="margin-left:auto" class="small">Autosave: <span id="autosaveStatus">off</span></div>
+            </div>
+          </div>
+        </div>
 
-    <div id="editorWrap" style="display:none;margin-top:12px">
-      <h4>Edit database.json</h4>
-      <textarea id="dbEditor" rows="14" style="width:100%"></textarea>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <button id="saveDbBtn" class="btn">Save DB</button>
-        <button id="cancelEdit" class="btn" style="background:#111827">Cancel</button>
+        <div class="card" style="margin-top:14px">
+          <h4 style="margin:0">Activity / Logs</h4>
+          <div id="log" class="list small" style="margin-top:8px;min-height:120px;max-height:220px;overflow:auto"></div>
+        </div>
+      </div>
+
+      <!-- right -->
+      <div>
+        <div class="card">
+          <h4 style="margin:0">Access Codes</h4>
+          <div id="codesList" class="list" style="margin-top:8px">Loading...</div>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <h4 style="margin:0">Accounts & Servers</h4>
+          <div id="accountsList" class="list" style="margin-top:8px">Loading...</div>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <h4 style="margin:0">Advanced / GitHub</h4>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+            <button id="toggleGitBtn" class="btn ghost">🔒 Show GitHub fields</button>
+          </div>
+          <div id="githubArea" style="margin-top:10px;display:none">
+            <div class="small">NOTE: Jangan simpan token di file publik. Hanya untuk private repos.</div>
+            <input id="ghUser" class="input" placeholder="GitHub username (optional)"/>
+            <input id="ghRepo" class="input" placeholder="Repo name for DB (optional)"/>
+            <input id="ghPat" class="input" placeholder="GitHub PAT (optional, private repo only)"/>
+            <div style="margin-top:8px;display:flex;gap:8px">
+              <button id="btnSaveGit" class="btn">Save Git Config</button>
+              <button id="btnTestGit" class="btn ghost">Test Git Access</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
+  <div class="toast-wrap" id="toasts"></div>
+
+<script src="settings.js"></script>
 <script>
-function b64enc(s){ return btoa(unescape(encodeURIComponent(s))); }
-function b64dec(b){ try{ return decodeURIComponent(escape(atob(b))); }catch(e){ return atob(b); } }
-const API_BASE = 'https://api.github.com/repos';
+/*
+  Admin panel JS (index.html)
+  - uses settings.js or localStorage for API base
+  - stores ADMIN_KEY in localStorage
+  - operations: load/generate/save DB, edit DB, show codes/accounts, stats
+*/
 
-let currentDB = null;
-let currentSha = null;
-let cfg = { owner:'Slownam', repo:'databsepanel', path:'database.json', branch:'main', token:'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' };
+const LS_API_CFG = 'panel_api_cfg';
+const LS_ADMIN_KEY = 'panel_admin_key';
+const LS_GH = 'panel_admin_ghcfg';
+let currentDB = { codes: [], accounts: [] };
 
-function setStatus(t){ document.getElementById('status').textContent = t; }
-
-async function ghGet(owner, repo, path, token){
-  const url = `${API_BASE}/${owner}/${repo}/contents/${encodeURIComponent(path)}`;
-  const res = await fetch(url, { headers: { 'Authorization':'token '+token, 'Accept':'application/vnd.github.v3+json' }});
-  if(res.status === 404) return null;
-  if(!res.ok) throw new Error('GitHub GET error: ' + res.status + ' ' + await res.text());
-  return await res.json();
-}
-async function ghPut(owner, repo, path, contentB64, message, sha, token, branch){
-  const url = `${API_BASE}/${owner}/${repo}/contents/${encodeURIComponent(path)}`;
-  const body = { message, content: contentB64, branch };
-  if(sha) body.sha = sha;
-  const res = await fetch(url, { method:'PUT', headers:{ 'Authorization':'token '+token, 'Accept':'application/vnd.github.v3+json', 'Content-Type':'application/json' }, body: JSON.stringify(body) });
-  if(!res.ok) throw new Error('GitHub PUT error: ' + res.status + ' ' + await res.text());
-  return await res.json();
-}
-
-function genCode(){
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  let s = 'lf';
-  for(let i=0;i<5;i++) s += chars.charAt(Math.floor(Math.random()*chars.length));
-  return s;
-}
-
-async function loadDb(){
+// util: get api base (settings.js overrides)
+function getApiBase(){
   try{
-    setStatus('Loading DB...');
-    const file = await ghGet(cfg.owner, cfg.repo, cfg.path, cfg.token);
-    if(!file){
-      currentDB = { codes: [], accounts: [] };
-      currentSha = null;
-      setStatus('DB tidak ditemukan — akan dibuat pada save.');
-    } else {
-      currentSha = file.sha;
-      currentDB = JSON.parse(b64dec(file.content.replace(/\n/g,'')));
-      currentDB.codes = currentDB.codes || [];
-      currentDB.accounts = currentDB.accounts || [];
-      setStatus(`Loaded DB — codes: ${currentDB.codes.length}, accounts: ${currentDB.accounts.length}`);
-    }
-    renderDbView();
-  }catch(err){
-    setStatus('Error load DB: '+err.message);
-    console.error(err);
+    const local = JSON.parse(localStorage.getItem(LS_API_CFG) || 'null');
+    if(local && local.api_base) return local.api_base;
+  }catch(e){}
+  if(window.API_CONFIG && window.API_CONFIG.API_BASE) return window.API_CONFIG.API_BASE;
+  return 'http://127.0.0.1:3000';
+}
+function saveApiCfg(apiBase){ localStorage.setItem(LS_API_CFG, JSON.stringify({ api_base: apiBase })); }
+function getAdminKey(){ return localStorage.getItem(LS_ADMIN_KEY) || ''; }
+function saveAdminKey(k){ if(!k) localStorage.removeItem(LS_ADMIN_KEY); else localStorage.setItem(LS_ADMIN_KEY, k); }
+function saveGhCfg(obj){ localStorage.setItem(LS_GH, JSON.stringify(obj)); }
+function getGhCfg(){ try{ return JSON.parse(localStorage.getItem(LS_GH)||'null'); }catch(e){ return null; } }
+
+// toast
+function toast(msg, type='info', ttl=3500){
+  const id = 't'+Date.now();
+  const wrap = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = 'toast' + (type==='ok'? ' ok' : type==='err' ? ' err' : '');
+  el.id = id;
+  el.innerHTML = msg;
+  wrap.appendChild(el);
+  setTimeout(()=>{ try{ el.style.opacity=0; setTimeout(()=>el.remove(),300); }catch(e){} }, ttl);
+}
+
+// tiny loading helper
+function setBtnLoading(btn, on=true, text=null){
+  if(on){
+    btn._orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="lds"><div></div><div></div><div></div></span> ` + (text || btn._orig);
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = btn._orig || btn.innerHTML;
   }
 }
 
-function renderDbView(){
-  const wrap = document.getElementById('dbView'); wrap.innerHTML = '';
-  if(!currentDB){ wrap.innerHTML = '<div class="muted">DB belum dimuat</div>'; return; }
-  const codes = (currentDB.codes||[]).slice().reverse();
-  const accounts = (currentDB.accounts||[]).slice().reverse();
-
-  const left = document.createElement('div'); left.style.marginBottom='8px';
-  left.innerHTML = `<div style="font-weight:700">Codes (${codes.length})</div>`;
-  codes.forEach(c=>{
-    const d = document.createElement('div'); d.style.padding='6px 0'; d.innerHTML = `<strong>${c.code}</strong> ${c.used?'<span style="color:#fca5a5">(used)</span>':''} <div class="muted">for: ${c.name||'-'} • ${c.created_at||''}</div>`;
-    left.appendChild(d);
-  });
-
-  const right = document.createElement('div');
-  right.innerHTML = `<div style="font-weight:700;margin-top:8px">Accounts (${accounts.length})</div>`;
-  accounts.forEach(a=>{
-    const d = document.createElement('div'); d.style.padding='6px 0'; d.innerHTML = `<strong>${a.name || '-'}</strong> <div class="muted">${a.email||'-'} • ${a.wa||'-'} • Exp: ${a.expires_at||'-'}</div>`;
-    right.appendChild(d);
-  });
-
-  const container = document.createElement('div'); container.style.display='grid'; container.style.gridTemplateColumns='1fr 1fr'; container.style.gap='12px';
-  container.appendChild(left); container.appendChild(right);
-  wrap.appendChild(container);
+// api helpers
+async function apiFetch(path, opts = {}){
+  const base = getApiBase().replace(/\/+$/,'');
+  const url = base + path;
+  const res = await fetch(url, opts);
+  const j = await res.json().catch(()=>{ throw new Error('Server tidak merespon JSON') });
+  if(j && j.ok === false) throw new Error(j.error || JSON.stringify(j));
+  return j;
 }
 
-// UI bind
-document.getElementById('saveBtn').addEventListener('click', ()=>{
-  const owner = document.getElementById('owner').value.trim();
-  const repo  = document.getElementById('repo').value.trim();
-  const path  = document.getElementById('path').value.trim() || 'database.json';
-  const branch= document.getElementById('branch').value.trim() || 'main';
-  const token = document.getElementById('token').value.trim();
-  if(!owner||!repo||!token) { alert('Isi owner, repo, token'); return; }
-  cfg = { owner, repo, path, branch, token };
-  localStorage.setItem('admin_db_cfg', JSON.stringify(cfg));
-  loadDb();
-});
-
-document.getElementById('genCodeBtn').addEventListener('click', async ()=>{
+// load DB
+async function loadDB(showToast=true){
   try{
-    if(!cfg.token) throw new Error('Load DB config dulu (Save & Load DB).');
+    document.getElementById('codesList').innerText = 'Loading...';
+    document.getElementById('accountsList').innerText = 'Loading...';
+    const j = await apiFetch('/api/db');
+    currentDB = j.data || j;
+    document.getElementById('dbEditor').value = JSON.stringify(currentDB, null, 2);
+    renderCodes();
+    renderAccounts();
+    updateStatsMini();
+    if(showToast) toast('DB berhasil dimuat', 'ok');
+    log('DB loaded');
+  }catch(err){
+    console.error(err);
+    document.getElementById('codesList').innerText = 'Error loading';
+    document.getElementById('accountsList').innerText = 'Error loading';
+    toast('Load DB error: ' + err.message, 'err', 6000);
+    log('Load error: ' + err.message);
+  }
+}
+
+// render lists
+function renderCodes(){
+  const el = document.getElementById('codesList');
+  el.innerHTML = '';
+  const arr = (currentDB.codes || []).slice().reverse();
+  if(arr.length === 0){ el.innerHTML = '<div class="small">Kosong</div>'; return; }
+  arr.forEach(c => {
+    const d = document.createElement('div');
+    d.className = 'item';
+    const left = document.createElement('div');
+    left.innerHTML = `<div><strong>${c.code}</strong> ${c.used?'<span style="color:var(--err);font-weight:700"> (used)</span>':''}</div><div class="kv">for: ${c.name || '-'} • exp: ${c.expires_at || '-'}</div>`;
+    const right = document.createElement('div');
+    right.style.display='flex';
+    right.style.gap='8px';
+    const btn = document.createElement('button');
+    btn.className='btn ghost';
+    btn.innerText = 'Copy';
+    btn.addEventListener('click', ()=>{ navigator.clipboard.writeText(c.code); toast('Copied '+c.code, 'ok'); });
+    right.appendChild(btn);
+    d.appendChild(left);
+    d.appendChild(right);
+    el.appendChild(d);
+  });
+}
+
+function renderAccounts(){
+  const el = document.getElementById('accountsList');
+  el.innerHTML = '';
+  const arr = (currentDB.accounts || []).slice().reverse();
+  if(arr.length === 0){ el.innerHTML = '<div class="small">Kosong</div>'; return; }
+  arr.forEach(a => {
+    const d = document.createElement('div');
+    d.className = 'item';
+    const left = document.createElement('div');
+    const serverCount = (a.servers && a.servers.length) || 0;
+    left.innerHTML = `<div style="font-weight:700">${a.name || '-'}</div><div class="kv">${a.email || '-'} • ${a.wa || '-'} • Exp: ${a.expires_at || '-'}</div>`;
+    const right = document.createElement('div');
+    right.innerHTML = `<div class="kv">Servers: <strong>${serverCount}</strong></div>`;
+    d.appendChild(left);
+    d.appendChild(right);
+    el.appendChild(d);
+  });
+}
+
+// generate code
+async function generateCode(){
+  const btn = document.getElementById('genCodeBtn');
+  setBtnLoading(btn, true, 'Generating...');
+  try{
     const name = document.getElementById('codeName').value.trim();
-    if(!currentDB) await loadDb();
-    let code; let attempts=0;
-    do { code = genCode(); attempts++; if(attempts>30) throw new Error('Gagal generate kode unik'); } while((currentDB.codes||[]).some(x=>x.code===code));
-    currentDB.codes = currentDB.codes || [];
-    currentDB.codes.push({ code, name: name || '', created_at: new Date().toISOString(), used:false });
-    const content = b64enc(JSON.stringify(currentDB, null, 2));
-    const res = await ghPut(cfg.owner, cfg.repo, cfg.path, content, 'Generate code ' + code, currentSha, cfg.token, cfg.branch);
-    currentSha = res.content.sha;
-    await loadDb();
-    alert('Kode dibuat: ' + code);
-  }catch(err){ alert('Error: ' + err.message); console.error(err); }
-});
+    const exp = document.getElementById('codeExpiry').value;
+    if(!exp) { throw new Error('Isi tanggal expired'); }
+    const key = getAdminKey();
+    if(!key) throw new Error('ADMIN_KEY belum disimpan di Settings');
+    const base = getApiBase();
+    const r = await fetch(base + '/api/generate', { method:'POST', headers:{ 'Content-Type':'application/json','x-api-key': key }, body: JSON.stringify({ name, expires_at: new Date(exp+'T23:59:59Z').toISOString() }) });
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error || JSON.stringify(j));
+    toast('Kode dibuat: ' + j.code, 'ok');
+    log('Generated code: ' + j.code);
+    await loadDB(false);
+  }catch(err){
+    toast('Generate error: ' + err.message, 'err', 6000);
+    log('Generate error: ' + err.message);
+  }finally{
+    setBtnLoading(btn, false);
+  }
+}
 
-document.getElementById('editDbBtn').addEventListener('click', ()=>{
-  if(!currentDB){ alert('Load DB dulu'); return; }
-  document.getElementById('editorWrap').style.display = 'block';
-  document.getElementById('dbEditor').value = JSON.stringify(currentDB, null, 2);
-});
-
-document.getElementById('cancelEdit').addEventListener('click', ()=>{ document.getElementById('editorWrap').style.display='none'; });
-
-document.getElementById('saveDbBtn').addEventListener('click', async ()=>{
+// save db (from editor)
+async function saveDBFromEditor(){
+  const btn = document.getElementById('saveDbBtn');
+  setBtnLoading(btn, true, 'Saving...');
   try{
-    const text = document.getElementById('dbEditor').value;
-    const parsed = JSON.parse(text);
-    const content = b64enc(JSON.stringify(parsed, null, 2));
-    const res = await ghPut(cfg.owner, cfg.repo, cfg.path, content, 'Manual edit DB via admin', currentSha, cfg.token, cfg.branch);
-    currentSha = res.content.sha;
-    document.getElementById('editorWrap').style.display = 'none';
-    await loadDb();
-    alert('DB disimpan');
-  }catch(err){ alert('Save error: ' + err.message); console.error(err); }
+    const txt = document.getElementById('dbEditor').value;
+    const parsed = JSON.parse(txt);
+    const key = getAdminKey();
+    if(!key) throw new Error('ADMIN_KEY belum disimpan');
+    const base = getApiBase();
+    const r = await fetch(base + '/api/db/save', { method:'POST', headers:{ 'Content-Type':'application/json','x-api-key':key }, body: JSON.stringify({ data: parsed }) });
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error || JSON.stringify(j));
+    toast('DB saved', 'ok');
+    log('DB saved via API');
+    await loadDB(false);
+  }catch(err){
+    toast('Save DB error: ' + err.message, 'err', 7000);
+    log('Save DB error: ' + err.message);
+  }finally{
+    setBtnLoading(btn, false);
+  }
+}
+
+// reset db
+async function resetDB(){
+  if(!confirm('Reset DB ke kosong? (backup otomatis dibuat)')) return;
+  const btn = document.getElementById('resetDbBtn');
+  setBtnLoading(btn, true, 'Resetting...');
+  try{
+    const key = getAdminKey();
+    if(!key) throw new Error('ADMIN_KEY belum disimpan');
+    const base = getApiBase();
+    const r = await fetch(base + '/api/db/save', { method:'POST', headers:{ 'Content-Type':'application/json','x-api-key': key }, body: JSON.stringify({ data: { codes: [], accounts: [] } }) });
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error || JSON.stringify(j));
+    toast('DB di-reset', 'ok');
+    log('DB reset');
+    await loadDB(false);
+  }catch(err){
+    toast('Reset error: ' + err.message, 'err', 7000);
+    log('Reset error: ' + err.message);
+  }finally{
+    setBtnLoading(btn, false);
+  }
+}
+
+// format editor JSON
+function formatEditor(){
+  const t = document.getElementById('dbEditor').value;
+  try{
+    const p = JSON.parse(t);
+    document.getElementById('dbEditor').value = JSON.stringify(p, null, 2);
+    toast('Formatted JSON', 'ok');
+  }catch(err){
+    toast('Invalid JSON: ' + err.message, 'err', 5000);
+  }
+}
+
+// simple log output
+function log(msg){
+  const el = document.getElementById('log');
+  el.innerHTML = new Date().toLocaleString() + ' — ' + msg + '<br/>' + el.innerHTML;
+}
+
+// stats mini
+async function updateStatsMini(){
+  try{
+    const j = await apiFetch('/api/stats');
+    document.getElementById('statsMini').innerText = `Accounts: ${j.totalAccounts} • Servers: ${j.totalServers}`;
+  }catch(e){
+    document.getElementById('statsMini').innerText = 'Stats error';
+  }
+}
+
+// event bindings
+document.getElementById('loadDbBtn').addEventListener('click', ()=> loadDB(true));
+document.getElementById('saveDbBtn').addEventListener('click', ()=> saveDBFromEditor());
+document.getElementById('genCodeBtn').addEventListener('click', ()=> generateCode());
+document.getElementById('resetDbBtn').addEventListener('click', ()=> resetDB());
+document.getElementById('formatBtn').addEventListener('click', ()=> formatEditor());
+document.getElementById('applyEditorBtn').addEventListener('click', ()=> saveDBFromEditor());
+document.getElementById('btnReload').addEventListener('click', ()=> loadDB(true));
+document.getElementById('btnExport').addEventListener('click', ()=>{
+  const blob = new Blob([document.getElementById('dbEditor').value], { type:'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='database.json'; a.click(); URL.revokeObjectURL(a.href);
+  toast('Exported database.json', 'ok');
 });
 
-document.getElementById('exportBtn').addEventListener('click', ()=>{
-  if(!currentDB){ alert('Load DB dulu'); return; }
-  const blob = new Blob([JSON.stringify(currentDB, null, 2)], { type:'application/json' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'database.json'; a.click(); URL.revokeObjectURL(a.href);
+// settings save
+document.getElementById('saveSettingsBtn').addEventListener('click', ()=>{
+  const apiBase = document.getElementById('apiBaseInput').value.trim();
+  const akey = document.getElementById('adminKeyInput').value.trim();
+  if(apiBase) saveApiCfg(apiBase);
+  if(akey) saveAdminKey(akey); else saveAdminKey('');
+  toast('Settings disimpan di browser', 'ok');
+  log('Settings saved');
+  updateStatsMini();
 });
 
-// Try load saved cfg on load
+// toggle github area
+document.getElementById('toggleGitBtn').addEventListener('click', ()=>{
+  const area = document.getElementById('githubArea');
+  area.style.display = area.style.display === 'none' ? 'block' : 'none';
+  document.getElementById('toggleGitBtn').innerText = area.style.display === 'none' ? '🔒 Show GitHub fields' : '🔐 Hide GitHub fields';
+});
+
+// save/test github (local storage)
+document.getElementById('btnSaveGit').addEventListener('click', ()=>{
+  const cfg = { user: document.getElementById('ghUser').value.trim(), repo: document.getElementById('ghRepo').value.trim(), pat: document.getElementById('ghPat').value.trim() };
+  saveGhCfg(cfg);
+  toast('GitHub config saved (local)', 'ok');
+  log('Saved GitHub config locally');
+});
+document.getElementById('btnTestGit').addEventListener('click', async ()=>{
+  const cfg = getGhCfg();
+  if(!cfg || !cfg.pat || !cfg.user || !cfg.repo) return toast('Isi GitHub user/repo/pat dulu', 'err');
+  try{
+    // simple test: call GitHub API to get repo (no auth header if pat missing)
+    const res = await fetch(`https://api.github.com/repos/${cfg.user}/${cfg.repo}`, { headers: cfg.pat ? { Authorization: 'token ' + cfg.pat } : {} });
+    if(!res.ok) throw new Error('GitHub access failed: ' + res.status);
+    toast('GitHub repo reachable', 'ok');
+    log('GitHub test ok');
+  }catch(err){
+    toast('GitHub test error: ' + err.message, 'err', 7000);
+    log('GitHub test error: ' + err.message);
+  }
+});
+
+// on load: init UI from localStorage / settings.js
 window.addEventListener('load', ()=>{
-  const saved = localStorage.getItem('admin_db_cfg');
-  if(saved){
-    try{ cfg = JSON.parse(saved); document.getElementById('owner').value = cfg.owner; document.getElementById('repo').value = cfg.repo; document.getElementById('path').value = cfg.path; document.getElementById('branch').value = cfg.branch || 'main'; document.getElementById('token').value = cfg.token; loadDb(); }catch(e){ console.warn(e); }
-  } else {
-    // auto-load the prefilled cfg we set at top
-    document.getElementById('owner').value = cfg.owner;
-    document.getElementById('repo').value = cfg.repo;
-    document.getElementById('path').value = cfg.path;
-    document.getElementById('branch').value = cfg.branch;
-    document.getElementById('token').value = cfg.token;
-    // try auto load once
-    loadDb().catch(()=>{});
+  // put API_BASE / ADMIN_KEY if exist
+  try{
+    const cfg = JSON.parse(localStorage.getItem(LS_API_CFG) || 'null');
+    if(cfg && cfg.api_base) document.getElementById('apiBaseInput').value = cfg.api_base;
+    const akey = getAdminKey(); if(akey) document.getElementById('adminKeyInput').value = akey;
+    const gh = getGhCfg();
+    if(gh){ document.getElementById('ghUser').value = gh.user || ''; document.getElementById('ghRepo').value = gh.repo || ''; document.getElementById('ghPat').value = gh.pat || ''; }
+  }catch(e){}
+  // try auto-load DB (optional)
+  if(getApiBase()){
+    setTimeout(()=> loadDB(false), 300);
+    setTimeout(()=> updateStatsMini(), 500);
   }
 });
 </script>
