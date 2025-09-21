@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Admin Panel — LF</title>
+<link rel="icon" href="data:," />
+<style>
+  :root{
+    --bg1:#050216; --bg2:#07102a;
+    --card: rgba(255,255,255,0.03);
+    --accent1: #7c3aed;
+    --accent2: #4f46e5;
+    --muted: #9fb7ff;
+    --text: #e6eef8;
+    --ok: #22c55e;
+    --err: #ff6b6b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;font-family:Inter,system-ui,Segoe UI,Arial;background:linear-gradient(180deg,var(--bg1),var(--bg2));color:var(--text);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1300px;margin:28px auto;padding:20px}
+  .head{display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .brand{display:flex;gap:12px;align-items:center}
+  .logo{width:56px;height:56px;border-radius:12px;background:linear-gradient(90deg,var(--accent1),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:900;box-shadow:0 12px 40px rgba(79,70,229,0.14)}
+  h1{margin:0;font-size:20px}
+  .sub{color:var(--muted);font-size:13px}
+
+  .grid{display:grid;grid-template-columns:1fr 420px;gap:18px;margin-top:18px}
+  .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,0.03);box-shadow:0 12px 40px rgba(2,6,23,0.6)}
+  .row{display:flex;gap:10px;align-items:center}
+  .input{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--text);font-size:14px}
+  .btn{padding:10px 12px;border-radius:10px;border:0;background:linear-gradient(90deg,var(--accent1),var(--accent2));color:white;font-weight:700;cursor:pointer}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+  .small{font-size:13px;color:var(--muted)}
+  .list{max-height:360px;overflow:auto;border-radius:8px;padding:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03)}
+  .item{padding:8px;border-bottom:1px dashed rgba(255,255,255,0.02);display:flex;justify-content:space-between;gap:8px;align-items:center}
+  .kv{font-size:13px;color:#cfe0ff}
+  textarea.input{min-height:320px;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace;resize:vertical}
+
+  /* toast */
+  .toast-wrap{position:fixed;right:20px;bottom:20px;z-index:9999;display:flex;flex-direction:column-reverse;gap:10px;align-items:flex-end}
+  .toast{min-width:220px;padding:10px 12px;border-radius:10px;background:rgba(6,8,20,0.95);border-left:6px solid var(--accent1);color:var(--text);box-shadow:0 10px 30px rgba(3,7,18,0.6);font-weight:600}
+  .toast.ok{border-left-color:var(--ok)}
+  .toast.err{border-left-color:var(--err)}
+
+  /* loading dots */
+  .lds{display:inline-block;width:20px;height:20px}
+  .lds div{display:inline-block;width:6px;height:6px;margin:0 2px;background:#fff;border-radius:50%;animation:ld 1s linear infinite}
+  .lds div:nth-child(2){animation-delay:0.1s}
+  .lds div:nth-child(3){animation-delay:0.2s}
+  @keyframes ld{0%{transform:translateY(0)}50%{transform:translateY(-6px)}100%{transform:translateY(0)}}
+
+  /* responsive */
+  @media (max-width:1100px){
+    .grid{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="head">
+      <div class="brand">
+        <div class="logo">ADM</div>
+        <div>
+          <h1>Admin Panel — LF</h1>
+          <div class="sub">Kelola kode akses, database.json, dan lihat statistik server</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="btnReload" class="btn ghost">Reload DB</button>
+        <button id="btnExport" class="btn ghost">Export JSON</button>
+      </div>
+    </div>
+
+    <div class="grid" style="margin-top:18px">
+      <!-- left -->
+      <div>
+        <div class="card">
+          <div style="display:flex;gap:10px;align-items:center">
+            <input id="apiBaseInput" class="input" placeholder="API Base (ex: https://lfspipanel.idstore.biz.id)" />
+            <input id="adminKeyInput" class="input" placeholder="ADMIN_KEY (disimpan di browser)" />
+            <button id="saveSettingsBtn" class="btn">Simpan</button>
+          </div>
+
+          <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+            <input id="codeName" class="input" placeholder="Nama penerima (optional)" />
+            <input id="codeExpiry" class="input" type="date" />
+            <button id="genCodeBtn" class="btn">🎟️ Generate Kode</button>
+          </div>
+
+          <div style="margin-top:16px;display:flex;gap:8px;align-items:center">
+            <button id="loadDbBtn" class="btn ghost">Load DB</button>
+            <button id="saveDbBtn" class="btn">Save DB</button>
+            <button id="resetDbBtn" class="btn ghost">Reset DB</button>
+            <div style="margin-left:auto" class="small" id="statsMini">—</div>
+          </div>
+
+          <div style="margin-top:12px">
+            <h4 style="margin:0">Editor database.json</h4>
+            <textarea id="dbEditor" class="input" placeholder='{"codes":[],"accounts":[]}'> </textarea>
+            <div style="margin-top:8px;display:flex;gap:8px">
+              <button id="formatBtn" class="btn ghost">Format JSON</button>
+              <button id="applyEditorBtn" class="btn">Apply to DB (Save)</button>
+              <div style="margin-left:auto" class="small">Autosave: <span id="autosaveStatus">off</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <h4 style="margin:0">Activity / Logs</h4>
+          <div id="log" class="list small" style="margin-top:8px;min-height:120px;max-height:220px;overflow:auto"></div>
+        </div>
+      </div>
+
+      <!-- right -->
+      <div>
+        <div class="card">
+          <h4 style="margin:0">Access Codes</h4>
+          <div id="codesList" class="list" style="margin-top:8px">Loading...</div>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <h4 style="margin:0">Accounts & Servers</h4>
+          <div id="accountsList" class="list" style="margin-top:8px">Loading...</div>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <h4 style="margin:0">Advanced / GitHub</h4>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+            <button id="toggleGitBtn" class="btn ghost">🔒 Show GitHub fields</button>
+          </div>
+          <div id="githubArea" style="margin-top:10px;display:none">
+            <div class="small">NOTE: Jangan simpan token di file publik. Hanya untuk private repos.</div>
+            <input id="ghUser" class="input" placeholder="GitHub username (optional)"/>
+            <input id="ghRepo" class="input" placeholder="Repo name for DB (optional)"/>
+            <input id="ghPat" class="input" placeholder="GitHub PAT (optional, private repo only)"/>
+            <div style="margin-top:8px;display:flex;gap:8px">
+              <button id="btnSaveGit" class="btn">Save Git Config</button>
+              <button id="btnTestGit" class="btn ghost">Test Git Access</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-wrap" id="toasts"></div>
+
+<script src="/settings.js"></script>
+<script>
+/*
+  Admin panel JS (fixed api base handling)
+  - Avoid double /api (robust normalize)
+  - If ADMIN_KEY in localStorage it will be sent automatically
+*/
+
+const LS_API_CFG = 'panel_api_cfg';
+const LS_ADMIN_KEY = 'panel_admin_key';
+const LS_GH = 'panel_admin_ghcfg';
+let currentDB = { codes: [], accounts: [] };
+
+function getApiBase(){
+  // local override
+  try{
+    const local = JSON.parse(localStorage.getItem(LS_API_CFG) || 'null');
+    if(local && local.api_base) return local.api_base;
+  }catch(e){}
+  if(window.API_CONFIG && window.API_CONFIG.API_BASE) return window.API_CONFIG.API_BASE;
+  // default fallback (don't include /api)
+  return 'http://127.0.0.1:3000';
+}
+function saveApiCfg(apiBase){ localStorage.setItem(LS_API_CFG, JSON.stringify({ api_base: apiBase })); }
+function getAdminKey(){ return localStorage.getItem(LS_ADMIN_KEY) || ''; }
+function saveAdminKey(k){ if(!k) localStorage.removeItem(LS_ADMIN_KEY); else localStorage.setItem(LS_ADMIN_KEY, k); }
+function saveGhCfg(obj){ localStorage.setItem(LS_GH, JSON.stringify(obj)); }
+function getGhCfg(){ try{ return JSON.parse(localStorage.getItem(LS_GH)||'null'); }catch(e){ return null; } }
+
+// normalize base to remove trailing slashes and trailing /api if present
+function normalizeBase(raw){
+  if(!raw) return '';
+  let b = raw.trim();
+  // remove trailing slashes
+  b = b.replace(/\/+$/,'');
+  // if ends with /api remove it
+  b = b.replace(/\/api$/,'');
+  return b;
+}
+
+// toast
+function toast(msg, type='info', ttl=3500){
+  const id = 't'+Date.now();
+  const wrap = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = 'toast' + (type==='ok'? ' ok' : type==='err' ? ' err' : '');
+  el.id = id;
+  el.innerHTML = msg;
+  wrap.appendChild(el);
+  setTimeout(()=>{ try{ el.style.opacity=0; setTimeout(()=>el.remove(),300); }catch(e){} }, ttl);
+}
+
+// tiny loading helper
+function setBtnLoading(btn, on=true, text=null){
+  if(on){
+    btn._orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="lds"><div></div><div></div><div></div></span> ` + (text || btn._orig);
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = btn._orig || btn.innerHTML;
+  }
+}
+
+// apiFetch: path = 'db' or 'generate' or 'db/save' etc.
+// will construct: {normalizeBase}/api/{path-without-leading-slashes}
+async function apiFetch(path, opts = {}){
+  const baseRaw = getApiBase();
+  const base = normalizeBase(baseRaw);
+  let p = String(path||'').replace(/^\/+/,'');
+  // ensure path does NOT already have leading "api/"
+  if(p.startsWith('api/')) p = p.replace(/^api\//,'');
+  const url = base + '/api/' + p;
+  // default headers
+  opts.headers = opts.headers || {};
+  // attach admin key automatically if present
+  const akey = getAdminKey();
+  if(akey) opts.headers['x-api-key'] = akey;
+  // if body present and not headers content-type, set it
+  if(opts.body && !opts.headers['Content-Type']) opts.headers['Content-Type'] = 'application/json';
+  const response = await fetch(url, opts).catch(err => { throw new Error('Fetch error: ' + err.message); });
+  const text = await response.text();
+  // try parse JSON, else return error with raw body
+  try {
+    const j = JSON.parse(text || '{}');
+    if(j && j.ok === false) throw new Error(j.error || JSON.stringify(j));
+    return j;
+  } catch(e){
+    // return helpful message
+    throw new Error('Server tidak merespon JSON — isi:' + text);
+  }
+}
+
+// load DB
+async function loadDB(showToast=true){
+  try{
+    document.getElementById('codesList').innerText = 'Loading...';
+    document.getElementById('accountsList').innerText = 'Loading...';
+    const j = await apiFetch('db');
+    currentDB = j.data || j;
+    document.getElementById('dbEditor').value = JSON.stringify(currentDB, null, 2);
+    renderCodes();
+    renderAccounts();
+    updateStatsMini();
+    if(showToast) toast('DB berhasil dimuat', 'ok');
+    log('DB loaded');
+  }catch(err){
+    console.error(err);
+    document.getElementById('codesList').innerText = 'Error loading';
+    document.getElementById('accountsList').innerText = 'Error loading';
+    toast('Load DB error: ' + err.message, 'err', 6000);
+    log('Load error: ' + err.message);
+  }
+}
+
+// render lists
+function renderCodes(){
+  const el = document.getElementById('codesList');
+  el.innerHTML = '';
+  const arr = (currentDB.codes || []).slice().reverse();
+  if(arr.length === 0){ el.innerHTML = '<div class="small">Kosong</div>'; return; }
+  arr.forEach(c => {
+    const d = document.createElement('div');
+    d.className = 'item';
+    const left = document.createElement('div');
+    left.innerHTML = `<div><strong>${c.code}</strong> ${c.used?'<span style="color:var(--err);font-weight:700"> (used)</span>':''}</div><div class="kv">for: ${c.name || '-'} • exp: ${c.expires_at || '-'}</div>`;
+    const right = document.createElement('div');
+    right.style.display='flex';
+    right.style.gap='8px';
+    const btn = document.createElement('button');
+    btn.className='btn ghost';
+    btn.innerText = 'Copy';
+    btn.addEventListener('click', ()=>{ navigator.clipboard.writeText(c.code); toast('Copied '+c.code, 'ok'); });
+    right.appendChild(btn);
+    d.appendChild(left);
+    d.appendChild(right);
+    el.appendChild(d);
+  });
+}
+
+function renderAccounts(){
+  const el = document.getElementById('accountsList');
+  el.innerHTML = '';
+  const arr = (currentDB.accounts || []).slice().reverse();
+  if(arr.length === 0){ el.innerHTML = '<div class="small">Kosong</div>'; return; }
+  arr.forEach(a => {
+    const d = document.createElement('div');
+    d.className = 'item';
+    const left = document.createElement('div');
+    const serverCount = (a.servers && a.servers.length) || 0;
+    left.innerHTML = `<div style="font-weight:700">${a.name || '-'}</div><div class="kv">${a.email || '-'} • ${a.wa || '-'} • Exp: ${a.expires_at || '-'}</div>`;
+    const right = document.createElement('div');
+    right.innerHTML = `<div class="kv">Servers: <strong>${serverCount}</strong></div>`;
+    d.appendChild(left);
+    d.appendChild(right);
+    el.appendChild(d);
+  });
+}
+
+// generate code
+async function generateCode(){
+  const btn = document.getElementById('genCodeBtn');
+  setBtnLoading(btn, true, 'Generating...');
+  try{
+    const name = document.getElementById('codeName').value.trim();
+    const exp = document.getElementById('codeExpiry').value;
+    if(!exp) { throw new Error('Isi tanggal expired'); }
+    const payload = { name, expires_at: new Date(exp+'T23:59:59Z').toISOString() };
+    const r = await apiFetch('generate', { method:'POST', body: JSON.stringify(payload) });
+    // apiFetch returns parsed object
+    const code = r.code || (r.data && r.data.code) || JSON.stringify(r);
+    toast('Kode dibuat: ' + code, 'ok');
+    log('Generated code: ' + code);
+    await loadDB(false);
+  }catch(err){
+    toast('Generate error: ' + err.message, 'err', 6000);
+    log('Generate error: ' + err.message);
+  }finally{
+    setBtnLoading(btn, false);
+  }
+}
+
+// save db (from editor)
+async function saveDBFromEditor(){
+  const btn = document.getElementById('saveDbBtn');
+  setBtnLoading(btn, true, 'Saving...');
+  try{
+    const txt = document.getElementById('dbEditor').value;
+    const parsed = JSON.parse(txt);
+    const r = await apiFetch('db/save', { method:'POST', body: JSON.stringify({ data: parsed }) });
+    toast('DB saved', 'ok');
+    log('DB saved via API');
+    await loadDB(false);
+  }catch(err){
+    toast('Save DB error: ' + err.message, 'err', 7000);
+    log('Save DB error: ' + err.message);
+  }finally{
+    setBtnLoading(btn, false);
+  }
+}
+
+// reset db
+async function resetDB(){
+  if(!confirm('Reset DB ke kosong? (backup otomatis dibuat)')) return;
+  const btn = document.getElementById('resetDbBtn');
+  setBtnLoading(btn, true, 'Resetting...');
+  try{
+    const r = await apiFetch('db/save', { method:'POST', body: JSON.stringify({ data: { codes: [], accounts: [] } }) });
+    toast('DB di-reset', 'ok');
+    log('DB reset');
+    await loadDB(false);
+  }catch(err){
+    toast('Reset error: ' + err.message, 'err', 7000);
+    log('Reset error: ' + err.message);
+  }finally{
+    setBtnLoading(btn, false);
+  }
+}
+
+// format editor JSON
+function formatEditor(){
+  const t = document.getElementById('dbEditor').value;
+  try{
+    const p = JSON.parse(t);
+    document.getElementById('dbEditor').value = JSON.stringify(p, null, 2);
+    toast('Formatted JSON', 'ok');
+  }catch(err){
+    toast('Invalid JSON: ' + err.message, 'err', 5000);
+  }
+}
+
+// simple log output
+function log(msg){
+  const el = document.getElementById('log');
+  el.innerHTML = new Date().toLocaleString() + ' — ' + msg + '<br/>' + el.innerHTML;
+}
+
+// stats mini
+async function updateStatsMini(){
+  try{
+    const j = await apiFetch('stats');
+    // support older format
+    const totalAccounts = j.totalAccounts || j.total_accounts || (j.data && j.data.totalAccounts) || (j.data && j.data.total_accounts) || 0;
+    const totalServers = j.totalServers || j.total_servers || (j.data && j.data.totalServers) || (j.data && j.data.total_servers) || 0;
+    document.getElementById('statsMini').innerText = `Accounts: ${totalAccounts} • Servers: ${totalServers}`;
+  }catch(e){
+    document.getElementById('statsMini').innerText = 'Stats error';
+  }
+}
+
+// event bindings
+document.getElementById('loadDbBtn').addEventListener('click', ()=> loadDB(true));
+document.getElementById('saveDbBtn').addEventListener('click', ()=> saveDBFromEditor());
+document.getElementById('genCodeBtn').addEventListener('click', ()=> generateCode());
+document.getElementById('resetDbBtn').addEventListener('click', ()=> resetDB());
+document.getElementById('formatBtn').addEventListener('click', ()=> formatEditor());
+document.getElementById('applyEditorBtn').addEventListener('click', ()=> saveDBFromEditor());
+document.getElementById('btnReload').addEventListener('click', ()=> loadDB(true));
+document.getElementById('btnExport').addEventListener('click', ()=>{
+  const blob = new Blob([document.getElementById('dbEditor').value], { type:'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='database.json'; a.click(); URL.revokeObjectURL(a.href);
+  toast('Exported database.json', 'ok');
+});
+
+// settings save
+document.getElementById('saveSettingsBtn').addEventListener('click', ()=>{
+  const apiBase = document.getElementById('apiBaseInput').value.trim();
+  const akey = document.getElementById('adminKeyInput').value.trim();
+  if(apiBase) saveApiCfg(apiBase);
+  if(akey) saveAdminKey(akey); else saveAdminKey('');
+  toast('Settings disimpan di browser', 'ok');
+  log('Settings saved');
+  updateStatsMini();
+});
+
+// toggle github area
+document.getElementById('toggleGitBtn').addEventListener('click', ()=>{
+  const area = document.getElementById('githubArea');
+  area.style.display = area.style.display === 'none' ? 'block' : 'none';
+  document.getElementById('toggleGitBtn').innerText = area.style.display === 'none' ? '🔒 Show GitHub fields' : '🔐 Hide GitHub fields';
+});
+
+// save/test github (local storage)
+document.getElementById('btnSaveGit').addEventListener('click', ()=>{
+  const cfg = { user: document.getElementById('ghUser').value.trim(), repo: document.getElementById('ghRepo').value.trim(), pat: document.getElementById('ghPat').value.trim() };
+  saveGhCfg(cfg);
+  toast('GitHub config saved (local)', 'ok');
+  log('Saved GitHub config locally');
+});
+document.getElementById('btnTestGit').addEventListener('click', async ()=>{
+  const cfg = getGhCfg();
+  if(!cfg || !cfg.pat || !cfg.user || !cfg.repo) return toast('Isi GitHub user/repo/pat dulu', 'err');
+  try{
+    const res = await fetch(`https://api.github.com/repos/${cfg.user}/${cfg.repo}`, { headers: cfg.pat ? { Authorization: 'token ' + cfg.pat } : {} });
+    if(!res.ok) throw new Error('GitHub access failed: ' + res.status);
+    toast('GitHub repo reachable', 'ok');
+    log('GitHub test ok');
+  }catch(err){
+    toast('GitHub test error: ' + err.message, 'err', 7000);
+    log('GitHub test error: ' + err.message);
+  }
+});
+
+// on load: init UI from localStorage / settings.js
+window.addEventListener('load', ()=>{
+  // put API_BASE / ADMIN_KEY if exist
+  try{
+    const cfg = JSON.parse(localStorage.getItem(LS_API_CFG) || 'null');
+    if(cfg && cfg.api_base) document.getElementById('apiBaseInput').value = cfg.api_base;
+    const akey = getAdminKey(); if(akey) document.getElementById('adminKeyInput').value = akey;
+    const gh = getGhCfg();
+    if(gh){ document.getElementById('ghUser').value = gh.user || ''; document.getElementById('ghRepo').value = gh.repo || ''; document.getElementById('ghPat').value = gh.pat || ''; }
+  }catch(e){}
+  // try auto-load DB (optional)
+  if(getApiBase()){
+    setTimeout(()=> loadDB(false), 300);
+    setTimeout(()=> updateStatsMini(), 500);
+  }
+});
+</script>
+</body>
+</html>
